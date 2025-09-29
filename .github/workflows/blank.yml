@@ -31,4 +31,3 @@ jobs:
       - name: Upload to remote
         run: |
           rclone copy downloads remote:backup-folder --progress
-```
