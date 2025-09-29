@@ -20,8 +20,7 @@ jobs:
           mkdir -p downloads
           # contoh download file m3u8
           wget -O downloads/playlist.m3u8 "https://token-media-vidio-com.akamaized.net/exp=1759171710~acl=/uploads/1776441/*~hmac=88e65c5d3668f974774b2982877a721640e2a36f498f1762ca62313e6c0e8c58/uploads/1776441/ets-g30spki-20handbrake-872c_high.mp4.m3u8"
-          # contoh download file lain
-          wget -O downloads/sample.mp4 "https://example.com/path/to/video.mp4"
+          
 
       - name: Setup rclone config (decode base64)
         run: |
