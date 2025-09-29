@@ -1,0 +1,35 @@
+```yaml
+name: Download and Upload
+
+on:
+  workflow_dispatch: # hanya manual trigger
+
+jobs:
+  download-and-upload:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install rclone
+        run: |
+          curl https://rclone.org/install.sh | sudo bash
+
+      - name: Download file m3u8 / lainnya
+        run: |
+          mkdir -p downloads
+          # contoh download file m3u8
+          wget -O downloads/playlist.m3u8 "https://api.vidio.com/videos/1776441/common_tokenized_playlist.m3u8?ott=eyJhbGciOiJIUzI1NiJ9.eyJ1c2VyX2lkIjoiYWxsdXNlcnMiLCJ2aWRlb19pZCI6IjE3NzY0NDEiLCJjcmVhdGVkX2F0IjoxNzU5MTU3MzAwLCJleHRfZHVyYXRpb24iOjYwMH0.Fv3ebXXl0s_nU_WO9eAYgB0hiwZZh3ADZdeaokhEUuU"
+          # contoh download file lain
+          wget -O downloads/sample.mp4 "https://example.com/path/to/video.mp4"
+
+      - name: Setup rclone config (decode base64)
+        run: |
+          mkdir -p ~/.config/rclone
+          echo "${{ secrets.RCLONE_CONF_B64 }}" | base64 -d > ~/.config/rclone/rclone.conf
+
+      - name: Upload to remote (contoh: Google Drive)
+        run: |
+          rclone copy downloads remote:backup-folder --progress
+```
