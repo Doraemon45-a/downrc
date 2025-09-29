@@ -1,7 +1,8 @@
+```yaml
 name: Download and Upload
 
 on:
-  workflow_dispatch: # hanya manual trigger
+  workflow_dispatch: # hanya manual trigger dari GitHub UI
 
 jobs:
   download-and-upload:
@@ -15,11 +16,11 @@ jobs:
         run: |
           curl https://rclone.org/install.sh | sudo bash
 
-      - name: Download file m3u8 / lainnya
+      - name: Download files
         run: |
           mkdir -p downloads
           # contoh download file m3u8
-          wget -O downloads/playlist.m3u8 "https://api.vidio.com/videos/1776441/common_tokenized_playlist.m3u8?ott=eyJhbGciOiJIUzI1NiJ9.eyJ1c2VyX2lkIjoiYWxsdXNlcnMiLCJ2aWRlb19pZCI6IjE3NzY0NDEiLCJjcmVhdGVkX2F0IjoxNzU5MTU3MzAwLCJleHRfZHVyYXRpb24iOjYwMH0.Fv3ebXXl0s_nU_WO9eAYgB0hiwZZh3ADZdeaokhEUuU"
+          wget -O downloads/playlist.m3u8 "https://token-media-vidio-com.akamaized.net/exp=1759171710~acl=/uploads/1776441/*~hmac=88e65c5d3668f974774b2982877a721640e2a36f498f1762ca62313e6c0e8c58/uploads/1776441/ets-g30spki-20handbrake-872c_high.mp4.m3u8"
           # contoh download file lain
           wget -O downloads/sample.mp4 "https://example.com/path/to/video.mp4"
 
@@ -28,7 +29,7 @@ jobs:
           mkdir -p ~/.config/rclone
           echo "${{ secrets.RCLONE_CONF_B64 }}" | base64 -d > ~/.config/rclone/rclone.conf
 
-      - name: Upload to remote (contoh: Google Drive)
+      - name: Upload to remote
         run: |
           rclone copy downloads remote:backup-folder --progress
 ```
