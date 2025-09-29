@@ -27,6 +27,7 @@ jobs:
           mkdir -p ~/.config/rclone
           echo "${{ secrets.RCLONE_CONF_B64 }}" | base64 -d > ~/.config/rclone/rclone.conf
 
-      - name: Upload to remote
+      - name: Upload to Google Drive
         run: |
-          rclone copy downloads remote:backup-folder --progress
+          rclone copy downloads gdrive:backup-folder --progress
+
