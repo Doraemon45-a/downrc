@@ -20,7 +20,7 @@ jobs:
       - name: Download m3u8 file
         run: |
           mkdir -p downloads
-          wget -O downloads/playlist.m3u8 "https://token-media-vidio-com.akamaized.net/exp=1759171710~acl=/uploads/1776441/*~hmac=88e65c5d3668f974774b2982877a721640e2a36f498f1762ca62313e6c0e8c58/uploads/1776441/ets-g30spki-20handbrake-872c_high.mp4.m3u8"
+          wget -O downloads/playlist.m3u8 "https://api.vidio.com/videos/1776441/common_tokenized_playlist.m3u8?ott=eyJhbGciOiJIUzI1NiJ9.eyJ1c2VyX2lkIjoiYWxsdXNlcnMiLCJ2aWRlb19pZCI6IjE3NzY0NDEiLCJjcmVhdGVkX2F0IjoxNzU5MTU3MzAwLCJleHRfZHVyYXRpb24iOjYwMH0.Fv3ebXXl0s_nU_WO9eAYgB0hiwZZh3ADZdeaokhEUuU"
 
       - name: Convert m3u8 to mp4
         run: |
