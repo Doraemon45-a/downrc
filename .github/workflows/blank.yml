@@ -1,26 +1,30 @@
-name: Download and Upload
+name: Download, Convert and Upload
 
 on:
-  workflow_dispatch: # hanya manual trigger dari GitHub UI
+  workflow_dispatch: # manual trigger
 
 jobs:
-  download-and-upload:
+  download-convert-upload:
     runs-on: ubuntu-latest
 
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Install rclone
+      - name: Install dependencies
         run: |
+          sudo apt-get update
+          sudo apt-get install -y wget ffmpeg
           curl https://rclone.org/install.sh | sudo bash
 
-      - name: Download files
+      - name: Download m3u8 file
         run: |
           mkdir -p downloads
-          # contoh download file m3u8
           wget -O downloads/playlist.m3u8 "https://token-media-vidio-com.akamaized.net/exp=1759171710~acl=/uploads/1776441/*~hmac=88e65c5d3668f974774b2982877a721640e2a36f498f1762ca62313e6c0e8c58/uploads/1776441/ets-g30spki-20handbrake-872c_high.mp4.m3u8"
-          
+
+      - name: Convert m3u8 to mp4
+        run: |
+          ffmpeg -i downloads/playlist.m3u8 -c copy downloads/output.mp4
 
       - name: Setup rclone config (decode base64)
         run: |
@@ -29,5 +33,4 @@ jobs:
 
       - name: Upload to Google Drive
         run: |
-          rclone copy downloads gdrive:backup-folder --progress
-
+          rclone copy downloads/output.mp4 gdrive:backup-folder --progress
