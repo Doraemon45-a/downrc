@@ -1,4 +1,4 @@
-name: Download Video and Upload to Google Drive + Telegram
+name: Download Video → GDrive + Telegram
 
 on:
   workflow_dispatch:
@@ -13,7 +13,7 @@ on:
         type: string
 
 jobs:
-  download-upload:
+  process-video:
     runs-on: ubuntu-latest
 
     steps:
@@ -31,23 +31,24 @@ jobs:
           mkdir -p ~/.config/rclone
           echo "${{ secrets.RCLONE_CONF_B64 }}" | base64 -d > ~/.config/rclone/rclone.conf
 
-      - name: Download and Convert (if m3u8)
+      - name: Download or Convert Video
         run: |
           mkdir -p downloads
           URL="${{ github.event.inputs.VIDEO_URL }}"
           NAME="${{ github.event.inputs.OUTPUT_NAME }}"
-          
+
           if [[ "$URL" == *".m3u8"* ]]; then
-            echo "Detected HLS stream. Converting to MP4..."
+            echo "▶ Detected HLS Stream - Converting to MP4..."
             ffmpeg -i "$URL" -c copy "downloads/${NAME}.mp4"
           else
-            echo "Detected MP4 file. Downloading directly..."
+            echo "▶ Detected MP4 - Downloading..."
             curl -L "$URL" -o "downloads/${NAME}.mp4"
           fi
 
       - name: Upload to Google Drive
         run: |
           NAME="${{ github.event.inputs.OUTPUT_NAME }}"
+          echo "⬆ Uploading to Google Drive..."
           rclone copy "downloads/${NAME}.mp4" gdrive:backup-folder --progress
 
       - name: Upload to Telegram (Leech)
@@ -55,5 +56,8 @@ jobs:
           BOT="${{ secrets.BOT_TOKEN }}"
           CHAT="${{ secrets.CHAT_ID }}"
           NAME="${{ github.event.inputs.OUTPUT_NAME }}"
-          curl -F chat_id="$CHAT" -F video=@"downloads/${NAME}.mp4" \
-               "https://api.telegram.org/bot$BOT/sendVideo"
+
+          echo "📤 Uploading to Telegram (sendDocument, up to 2GB)..."
+          curl -F chat_id="$CHAT" \
+               -F document=@"downloads/${NAME}.mp4" \
+               "https://api.telegram.org/bot$BOT/sendDocument"
