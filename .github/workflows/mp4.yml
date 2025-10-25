@@ -1,0 +1,36 @@
+name: Download MP4 and Upload to Google Drive
+
+on:
+  workflow_dispatch: # manual trigger
+
+jobs:
+  download-upload:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y curl aria2
+          curl https://rclone.org/install.sh | sudo bash
+
+      - name: Setup rclone config (decode base64)
+        run: |
+          mkdir -p ~/.config/rclone
+          echo "${{ secrets.RCLONE_CONF_B64 }}" | base64 -d > ~/.config/rclone/rclone.conf
+
+      - name: Download MP4 File
+        run: |
+          mkdir -p downloads
+          aria2c -x 16 -s 16 -k 1M "https://petmoniker.com/birds/toucan-names/#" \
+                -o downloads/output.mp4
+
+      - name: Upload to Google Drive
+        run: |
+          rclone copy downloads/output.mp4 gdrive:backup-folder --progress
+
+      - name: Cleanup local files
+        run: rm -rf downloads
