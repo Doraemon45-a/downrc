@@ -1,7 +1,17 @@
 name: Download MP4 and Upload to Google Drive
 
 on:
-  workflow_dispatch: # manual trigger
+  workflow_dispatch:
+    inputs:
+      FILE_URL:
+        description: "Masukkan URL file MP4 atau M3U8"
+        required: true
+        type: string
+      OUTPUT_NAME:
+        description: "Nama file output (tanpa ekstensi). Contoh: video_saya"
+        required: false
+        default: "output"
+        type: string
 
 jobs:
   download-upload:
@@ -14,7 +24,7 @@ jobs:
       - name: Install dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y curl aria2
+          sudo apt-get install -y curl aria2 ffmpeg
           curl https://rclone.org/install.sh | sudo bash
 
       - name: Setup rclone config (decode base64)
@@ -22,15 +32,25 @@ jobs:
           mkdir -p ~/.config/rclone
           echo "${{ secrets.RCLONE_CONF_B64 }}" | base64 -d > ~/.config/rclone/rclone.conf
 
-      - name: Download MP4 File
+      - name: Create downloads folder
+        run: mkdir -p downloads
+
+      - name: Detect if URL is MP4 or M3U8 and Process
         run: |
-          mkdir -p downloads
-          aria2c -x 16 -s 16 -k 1M "https://cdn.shortyearn.com/sangetods.net/videos/2025/week42/processed_munte8-36954321-822c-43ca-9610-c6c2eb259155.mp4" \
-                -o downloads/output.mp4
+          URL="${{ github.event.inputs.FILE_URL }}"
+          OUTPUT="${{ github.event.inputs.OUTPUT_NAME }}"
+
+          if [[ "$URL" == *.m3u8 ]]; then
+            echo "URL adalah M3U8 → memakai ffmpeg untuk convert..."
+            ffmpeg -i "$URL" -c copy "downloads/$OUTPUT.mp4"
+          else
+            echo "URL adalah MP4 → download langsung..."
+            aria2c -x 16 -s 16 -k 1M "$URL" -o "downloads/$OUTPUT.mp4"
+          fi
 
       - name: Upload to Google Drive
         run: |
-          rclone copy downloads/output.mp4 gdrive:backup-folder --progress
+          rclone copy downloads/*.mp4 gdrive:backup-folder --progress
 
       - name: Cleanup local files
         run: rm -rf downloads
