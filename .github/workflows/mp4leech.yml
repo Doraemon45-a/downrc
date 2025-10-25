@@ -57,7 +57,11 @@ jobs:
           CHAT="${{ secrets.CHAT_ID }}"
           NAME="${{ github.event.inputs.OUTPUT_NAME }}"
 
-          echo "📤 Uploading to Telegram (sendDocument, up to 2GB)..."
-          curl -F chat_id="$CHAT" \
-               -F document=@"downloads/${NAME}.mp4" \
-               "https://api.telegram.org/bot$BOT/sendDocument"
+          echo "📤 Uploading to Telegram (sendDocument, streamed, up to 2GB)..."
+          curl -X POST \
+            -H "Expect:" \
+            -F chat_id="$CHAT" \
+            -F disable_content_type_detection="true" \
+            -F document=@downloads/${NAME}.mp4";type=video/mp4" \
+            "https://api.telegram.org/bot$BOT/sendDocument"
+
