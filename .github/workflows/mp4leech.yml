@@ -1,0 +1,51 @@
+name: Download Video and Upload to Google Drive + Telegram
+
+on:
+  workflow_dispatch:
+    inputs:
+      VIDEO_URL:
+        description: "Masukkan URL video (m3u8 atau mp4)"
+        required: true
+        type: string
+
+jobs:
+  download-upload:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y ffmpeg curl jq
+          curl https://rclone.org/install.sh | sudo bash
+
+      - name: Setup rclone config
+        run: |
+          mkdir -p ~/.config/rclone
+          echo "${{ secrets.RCLONE_CONF_B64 }}" | base64 -d > ~/.config/rclone/rclone.conf
+
+      - name: Download and Convert (if m3u8)
+        run: |
+          mkdir -p downloads
+          URL="${{ github.event.inputs.VIDEO_URL }}"
+          if [[ "$URL" == *".m3u8"* ]]; then
+            echo "Detected HLS stream. Converting to MP4..."
+            ffmpeg -i "$URL" -c copy downloads/output.mp4
+          else
+            echo "Detected MP4 file. Downloading directly..."
+            curl -L "$URL" -o downloads/output.mp4
+          fi
+
+      - name: Upload to Google Drive
+        run: |
+          rclone copy downloads/output.mp4 gdrive:backup-folder --progress
+
+      - name: Upload to Telegram (Leech)
+        run: |
+          BOT="${{ secrets.BOT_TOKEN }}"
+          CHAT="${{ secrets.CHAT_ID }}"
+          FILE="downloads/output.mp4"
+          curl -F chat_id="$CHAT" -F video=@"$FILE" "https://api.telegram.org/bot$BOT/sendVideo"
