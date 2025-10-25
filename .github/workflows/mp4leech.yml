@@ -7,6 +7,10 @@ on:
         description: "Masukkan URL video (m3u8 atau mp4)"
         required: true
         type: string
+      OUTPUT_NAME:
+        description: "Nama output file (tanpa .mp4)"
+        required: true
+        type: string
 
 jobs:
   download-upload:
@@ -31,21 +35,25 @@ jobs:
         run: |
           mkdir -p downloads
           URL="${{ github.event.inputs.VIDEO_URL }}"
+          NAME="${{ github.event.inputs.OUTPUT_NAME }}"
+          
           if [[ "$URL" == *".m3u8"* ]]; then
             echo "Detected HLS stream. Converting to MP4..."
-            ffmpeg -i "$URL" -c copy downloads/output.mp4
+            ffmpeg -i "$URL" -c copy "downloads/${NAME}.mp4"
           else
             echo "Detected MP4 file. Downloading directly..."
-            curl -L "$URL" -o downloads/output.mp4
+            curl -L "$URL" -o "downloads/${NAME}.mp4"
           fi
 
       - name: Upload to Google Drive
         run: |
-          rclone copy downloads/output.mp4 gdrive:backup-folder --progress
+          NAME="${{ github.event.inputs.OUTPUT_NAME }}"
+          rclone copy "downloads/${NAME}.mp4" gdrive:backup-folder --progress
 
       - name: Upload to Telegram (Leech)
         run: |
           BOT="${{ secrets.BOT_TOKEN }}"
           CHAT="${{ secrets.CHAT_ID }}"
-          FILE="downloads/output.mp4"
-          curl -F chat_id="$CHAT" -F video=@"$FILE" "https://api.telegram.org/bot$BOT/sendVideo"
+          NAME="${{ github.event.inputs.OUTPUT_NAME }}"
+          curl -F chat_id="$CHAT" -F video=@"downloads/${NAME}.mp4" \
+               "https://api.telegram.org/bot$BOT/sendVideo"
