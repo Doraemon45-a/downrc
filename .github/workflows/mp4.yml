@@ -25,7 +25,7 @@ jobs:
       - name: Download MP4 File
         run: |
           mkdir -p downloads
-          aria2c -x 16 -s 16 -k 1M "https://petmoniker.com/birds/toucan-names/#" \
+          aria2c -x 16 -s 16 -k 1M "https://cdn.shortyearn.com/sangetods.net/videos/2025/week42/processed_munte8-36954321-822c-43ca-9610-c6c2eb259155.mp4" \
                 -o downloads/output.mp4
 
       - name: Upload to Google Drive
