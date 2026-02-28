@@ -1,33 +1,88 @@
 name: Download HLS and Upload to Google Drive
 
 on:
-  workflow_dispatch: # manual trigger
+  workflow_dispatch:
+    inputs:
+      hls_url:
+        description: "Masukkan URL HLS (.m3u8)"
+        required: true
+      output_name:
+        description: "Nama file output (tanpa ekstensi)"
+        required: true
+        default: "output"
+      drive_path:
+        description: "Folder tujuan Google Drive"
+        required: true
+        default: "backup-folder"
 
 jobs:
   download-convert-upload:
     runs-on: ubuntu-latest
+    timeout-minutes: 360
 
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
 
+      # 1️⃣ Install dependencies
       - name: Install dependencies
         run: |
           sudo apt-get update
           sudo apt-get install -y ffmpeg curl
           curl https://rclone.org/install.sh | sudo bash
 
-      - name: Setup rclone config (decode base64)
+      # 2️⃣ Setup rclone
+      - name: Setup rclone config
         run: |
           mkdir -p ~/.config/rclone
           echo "${{ secrets.RCLONE_CONF_B64 }}" | base64 -d > ~/.config/rclone/rclone.conf
 
+      # 3️⃣ Download & convert HLS
       - name: Convert HLS playlist to MP4
         run: |
           mkdir -p downloads
-          ffmpeg -i "https://token-media-vidio-com.akamaized.net/exp=1759171710~acl=/uploads/1776441/*~hmac=88e65c5d3668f974774b2982877a721640e2a36f498f1762ca62313e6c0e8c58/uploads/1776441/ets-g30spki-20handbrake-872c_high.mp4.m3u8" \
-                 -c copy downloads/output.mp4
 
+          ffmpeg -y \
+          -i "${{ github.event.inputs.hls_url }}" \
+          -c copy \
+          downloads/${{ github.event.inputs.output_name }}.mp4 \
+          2>&1 | tee ffmpeg.log
+
+          echo "FINAL_FILE=downloads/${{ github.event.inputs.output_name }}.mp4" >> $GITHUB_ENV
+
+      # 4️⃣ Upload ke Google Drive
       - name: Upload MP4 to Google Drive
         run: |
-          rclone copy downloads/output.mp4 gdrive:backup-folder --progress
+          rclone copy "$FINAL_FILE" \
+          "gdrive:/${{ github.event.inputs.drive_path }}/" \
+          --progress \
+          2>&1 | tee rclone.log
+
+      # 5️⃣ Kirim log ringkas ke Telegram
+      - name: Send Log to Telegram
+        if: always()
+        run: |
+          LOG_CONTENT=$(tail -n 20 ffmpeg.log rclone.log | sed 's/"/\\"/g')
+          
+          curl -s -X POST "https://api.telegram.org/bot${{ secrets.TG_BOT_TOKEN }}/sendMessage" \
+          -d chat_id="${{ secrets.TG_CHAT_ID }}" \
+          -d parse_mode="HTML" \
+          -d text="📄 <b>Workflow Log</b>%0A%0A<pre>${LOG_CONTENT}</pre>"
+
+      # ✅ Telegram SUCCESS
+      - name: Telegram SUCCESS
+        if: success()
+        run: |
+          curl -s -X POST "https://api.telegram.org/bot${{ secrets.TG_BOT_TOKEN }}/sendMessage" \
+          -d chat_id="${{ secrets.TG_CHAT_ID }}" \
+          -d parse_mode="HTML" \
+          -d text="✅ <b>SUCCESS</b>%0A📁 <code>${{ github.event.inputs.output_name }}.mp4</code>%0A📂 <code>${{ github.event.inputs.drive_path }}</code>"
+
+      # ❌ Telegram FAILED
+      - name: Telegram FAILED
+        if: failure()
+        run: |
+          curl -s -X POST "https://api.telegram.org/bot${{ secrets.TG_BOT_TOKEN }}/sendMessage" \
+          -d chat_id="${{ secrets.TG_CHAT_ID }}" \
+          -d parse_mode="HTML" \
+          -d text="❌ <b>FAILED</b>%0A🔗 <code>${{ github.event.inputs.hls_url }}</code>"
