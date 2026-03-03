@@ -1,18 +1,18 @@
-name: Smart Auto Scraper Downloader
+name: Hardcore Smart Downloader (Anti 7KB)
 
 on:
   workflow_dispatch:
     inputs:
       file_url:
-        description: "Masukkan URL (mp4 / m3u8 / halaman download)"
+        description: "Masukkan direct file URL"
         required: true
       drive_path:
         description: "Folder tujuan Google Drive"
         required: true
-        default: "auto-smart"
+        default: "hardcore-download"
 
 jobs:
-  smart-download:
+  download-upload:
     runs-on: ubuntu-latest
     timeout-minutes: 360
 
@@ -24,7 +24,7 @@ jobs:
       - name: Install Dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y curl wget ffmpeg grep sed
+          sudo apt-get install -y curl wget ffmpeg aria2
           curl https://rclone.org/install.sh | sudo bash
 
       # 2️⃣ Setup rclone
@@ -33,67 +33,58 @@ jobs:
           mkdir -p ~/.config/rclone
           echo "${{ secrets.RCLONE_CONF_B64 }}" | base64 -d > ~/.config/rclone/rclone.conf
 
-      # 3️⃣ Smart Detect + Scrape
-      - name: Detect & Process URL
+      # 3️⃣ Hardcore Download
+      - name: Download File (Anti Bot Mode)
         run: |
           mkdir -p downloads
           URL="${{ github.event.inputs.file_url }}"
+          FILENAME=$(basename "$URL")
 
-          echo "Checking Content-Type..."
-          CONTENT_TYPE=$(curl -L -s -o /dev/null -w "%{content_type}" "$URL")
-          echo "Content-Type: $CONTENT_TYPE"
+          echo "Attempt 1: aria2 (IDM style multi-connection)..."
 
-          FINAL_URL="$URL"
+          aria2c \
+            -x 16 -s 16 -k 1M \
+            --header="User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/122.0 Safari/537.36" \
+            --header="Referer: https://qu.ax/" \
+            -d downloads \
+            -o "$FILENAME" \
+            "$URL" \
+            2>&1 | tee download.log
 
-          # Jika HTML, coba scrape mp4 atau m3u8
-          if [[ "$CONTENT_TYPE" == *"text/html"* ]]; then
-            echo "HTML detected. Attempting to scrape..."
+          FILEPATH="downloads/$FILENAME"
 
-            PAGE=$(curl -L -s "$URL")
-
-            # Cari mp4
-            SCRAPED=$(echo "$PAGE" | grep -oE 'https?://[^"]+\.mp4')
-
-            # Kalau tidak ada mp4, cari m3u8
-            if [[ -z "$SCRAPED" ]]; then
-              SCRAPED=$(echo "$PAGE" | grep -oE 'https?://[^"]+\.m3u8')
-            fi
-
-            if [[ -z "$SCRAPED" ]]; then
-              echo "ERROR: Tidak ditemukan mp4 atau m3u8 di halaman."
-              exit 1
-            fi
-
-            FINAL_URL="$SCRAPED"
-            echo "Scraped URL: $FINAL_URL"
+          # Cek ukuran file
+          if [ -f "$FILEPATH" ]; then
+            SIZE=$(stat -c%s "$FILEPATH")
+          else
+            SIZE=0
           fi
 
-          # Detect ekstensi
-          if [[ "$FINAL_URL" == *.m3u8* ]]; then
-            echo "Detected m3u8 stream"
-            FILENAME="stream_output.mp4"
+          echo "Downloaded size: $SIZE bytes"
 
-            ffmpeg -y \
-              -i "$FINAL_URL" \
-              -c copy \
-              downloads/$FILENAME \
-              2>&1 | tee download.log
-
-          elif [[ "$FINAL_URL" == *.mp4* ]]; then
-            echo "Detected direct mp4 file"
-            FILENAME=$(basename "$FINAL_URL")
+          # Kalau <1MB anggap gagal (kemungkinan HTML)
+          if [ "$SIZE" -lt 1000000 ]; then
+            echo "File terlalu kecil. Fallback ke CURL..."
 
             curl -L \
-              -H "User-Agent: Mozilla/5.0" \
-              "$FINAL_URL" \
-              -o downloads/$FILENAME \
-              2>&1 | tee download.log
-          else
-            echo "ERROR: Format tidak didukung."
+              -H "User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/122.0 Safari/537.36" \
+              -H "Accept: */*" \
+              -H "Referer: https://qu.ax/" \
+              -o "$FILEPATH" \
+              "$URL" \
+              2>&1 | tee -a download.log
+
+            SIZE=$(stat -c%s "$FILEPATH")
+            echo "New size: $SIZE bytes"
+          fi
+
+          # Validasi final
+          if [ "$SIZE" -lt 1000000 ]; then
+            echo "ERROR: File masih terlalu kecil. Kemungkinan diblok server."
             exit 1
           fi
 
-          echo "FINAL_FILE=downloads/$FILENAME" >> $GITHUB_ENV
+          echo "FINAL_FILE=$FILEPATH" >> $GITHUB_ENV
           echo "FILE_NAME=$FILENAME" >> $GITHUB_ENV
 
       # 4️⃣ Upload ke Google Drive
@@ -113,7 +104,7 @@ jobs:
           curl -s -X POST "https://api.telegram.org/bot${{ secrets.TG_BOT_TOKEN }}/sendMessage" \
             -d chat_id="${{ secrets.TG_CHAT_ID }}" \
             -d parse_mode="HTML" \
-            -d text="📄 <b>Smart Downloader Log</b>%0A%0A<pre>${LOG_CONTENT}</pre>"
+            -d text="📄 <b>Hardcore Downloader Log</b>%0A%0A<pre>${LOG_CONTENT}</pre>"
 
       # SUCCESS
       - name: Telegram SUCCESS
