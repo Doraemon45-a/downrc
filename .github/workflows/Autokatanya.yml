@@ -1,0 +1,79 @@
+name: Auto Download & Upload to Google Drive
+
+on:
+  workflow_dispatch:
+    inputs:
+      file_url:
+        description: "Masukkan URL file"
+        required: true
+      drive_path:
+        description: "Folder tujuan Google Drive"
+        required: true
+        default: "auto-download"
+
+jobs:
+  auto-download:
+    runs-on: ubuntu-latest
+    timeout-minutes: 360
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      # Install dependencies
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y curl wget
+          curl https://rclone.org/install.sh | sudo bash
+
+      # Setup rclone
+      - name: Setup rclone
+        run: |
+          mkdir -p ~/.config/rclone
+          echo "${{ secrets.RCLONE_CONF_B64 }}" | base64 -d > ~/.config/rclone/rclone.conf
+
+      # Auto detect & download
+      - name: Detect file type & download
+        run: |
+          mkdir -p downloads
+
+          URL="${{ github.event.inputs.file_url }}"
+          FILENAME=$(basename "$URL")
+
+          # Jika URL tidak punya ekstensi, paksa .mp4
+          if [[ "$FILENAME" != *.* ]]; then
+            FILENAME="downloaded.mp4"
+          fi
+
+          echo "Downloading as $FILENAME"
+
+          wget -O "downloads/$FILENAME" "$URL"
+
+          echo "FINAL_FILE=downloads/$FILENAME" >> $GITHUB_ENV
+          echo "FILE_NAME=$FILENAME" >> $GITHUB_ENV
+
+      # Upload ke Google Drive
+      - name: Upload to Google Drive
+        run: |
+          rclone copy "$FINAL_FILE" \
+          "gdrive:/${{ github.event.inputs.drive_path }}/" \
+          --progress
+
+      # Telegram SUCCESS
+      - name: Telegram SUCCESS
+        if: success()
+        run: |
+          curl -s -X POST "https://api.telegram.org/bot${{ secrets.TG_BOT_TOKEN }}/sendMessage" \
+          -d chat_id="${{ secrets.TG_CHAT_ID }}" \
+          -d parse_mode="HTML" \
+          -d text="✅ <b>SUCCESS</b>%0A📁 <code>${FILE_NAME}</code>%0A📂 <code>${{ github.event.inputs.drive_path }}</code>"
+
+      # Telegram FAILED
+      - name: Telegram FAILED
+        if: failure()
+        run: |
+          curl -s -X POST "https://api.telegram.org/bot${{ secrets.TG_BOT_TOKEN }}/sendMessage" \
+          -d chat_id="${{ secrets.TG_CHAT_ID }}" \
+          -d parse_mode="HTML" \
+          -d text="❌ <b>FAILED</b>%0A🔗 <code>${{ github.event.inputs.file_url }}</code>"
